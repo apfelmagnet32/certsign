@@ -1,99 +1,99 @@
 # CertSign
 
-GUI-Tool fuer Linux, um Dateien mit einem (selbstsignierten) Zertifikat zu
-signieren. Du gibst ein Zertifikat (`.pfx`/`.p12`, Cert + Private Key) und
-eine Datei an, das Tool erkennt den Dateityp und signiert entsprechend.
+GUI tool for Linux that signs files with a (self-signed) certificate. You
+provide a certificate (`.pfx`/`.p12`, cert + private key) and a file; the
+tool detects the file type and signs it accordingly.
 
-## Unterstuetzte Dateitypen
+## Supported file types
 
-| Typ | Verfahren | Ergebnis |
+| Type | Method | Result |
 |---|---|---|
-| `.exe` | Authenticode via `osslsigncode` | Signatur ist in der `.exe` eingebettet, Windows/SmartScreen erkennt eine Signatur ("Herausgeber: unbekannt" bei selbstsigniertem Zertifikat) |
-| `.jar` | `jarsigner` | Signatur ist im Jar eingebettet, von der JVM pruefbar |
-| `.pdf` | `pyhanko` | Digitale Signatur ist im PDF eingebettet |
-| `.png`, `.jpg`, `.txt` | OpenSSL, eingebettet | Signatur + Zertifikat werden als Textblock ans Ende der Datei angehaengt (kein separates File). Datei bleibt normal nutzbar, jede Aenderung macht die Signatur ungueltig. |
-| `.docx` | OpenSSL, detached | Kein natives Signaturformat aktiv genutzt (siehe "Experimentell" unten). Es wird eine separate `<datei>.sig` (+ `.cert.pem`) danebengelegt. |
+| `.exe` | Authenticode via `osslsigncode` | Signature is embedded in the `.exe`; Windows/SmartScreen recognizes a signature ("Publisher: unknown" for a self-signed certificate) |
+| `.jar` | `jarsigner` | Signature is embedded in the jar, verifiable by the JVM |
+| `.pdf` | `pyhanko` | Digital signature is embedded in the PDF |
+| `.png`, `.jpg`, `.txt` | OpenSSL, embedded | Signature + certificate are appended as a text block to the end of the file (no separate file). File stays usable as normal; any change invalidates the signature. |
+| `.docx` | OpenSSL, detached | No native signature format actively used (see "Experimental" below). A separate `<file>.sig` (+ `.cert.pem`) is placed next to it. |
 
-Da alle Formate mit demselben Zertifikat signiert werden, zeigen sie auch
-alle denselben Herausgeber (das `CN` aus dem Zertifikat-Subject).
+Since all formats are signed with the same certificate, they all show the
+same publisher (the `CN` from the certificate subject).
 
-## Signatur-Checker (Browser)
+## Signature checker (browser)
 
-`web/verify.html` ist eine eigenstaendige, clientseitige Seite, die eine
-mit CertSign eingebettet signierte Datei (`.txt`/`.png`/`.jpg`) prueft:
-sucht den `CERTSIGN SIGNATURE`-Block, verifiziert die RSA-SHA256-Signatur
-gegen das eingebettete Zertifikat (via `node-forge`). Laeuft komplett im
-Browser, keine Uploads. Einfach lokal im Browser oeffnen oder hosten.
+`web/verify.html` is a standalone, client-side page that verifies a file
+CertSign signed with the embedded scheme (`.txt`/`.png`/`.jpg`): it finds
+the `CERTSIGN SIGNATURE` block and verifies the RSA-SHA256 signature
+against the embedded certificate (via `node-forge`). Runs entirely in the
+browser, no uploads. Just open it locally in a browser or host it.
 
-## Experimentell: echte Word-Signatur fuer .docx
+## Experimental: real Word signature for .docx
 
-`certsign/docx_sign.py` enthaelt einen Ansatz, der `.docx`-Dateien ueber
-headless LibreOffice (UNO-Automatisierung) mit einer echten, Word-kompatiblen
-OOXML-Signatur versieht (dieselbe Art, die Word unter "Datei > Informationen
-> Digitale Signatur hinzufuegen" erzeugt) - statt einer externen `.sig`.
+`certsign/docx_sign.py` contains an approach that embeds a real,
+Word-compatible OOXML signature into `.docx` files via headless
+LibreOffice (UNO automation) - the same kind Word produces under
+"File > Info > Add a Digital Signature" - instead of an external `.sig`.
 
-**Der Code ist nicht in die GUI eingebunden**, weil er bislang an einer
-einzigen Stelle scheitert: `.docx` als `com.sun.star.embed.XStorage` im
-OOXML-Format (statt ODF mit `META-INF/manifest.xml`) zu oeffnen. Mehrere
-bekannte Property-Varianten werden automatisch durchprobiert
-(`_uno_sign_docx.py`, `open_ooxml_storage()`), scheitern aber alle mit
-`Can not open storage!`. Alles andere funktioniert nachweislich: NSS-Cert-
-Import, UNO-Verbindung zu headless LibreOffice, Zertifikat-Abruf daraus.
+**The code is not wired into the GUI** because it currently fails at one
+spot: opening the `.docx` as a `com.sun.star.embed.XStorage` in OOXML
+format (instead of ODF with `META-INF/manifest.xml`). Several known
+property variants are tried automatically (`_uno_sign_docx.py`,
+`open_ooxml_storage()`), but all of them fail with `Can not open
+storage!`. Everything else works, verifiably: NSS cert import, UNO
+connection to headless LibreOffice, certificate lookup from it.
 
-Falls du das zum Laufen bringst (oder die richtige `StorageFormat`/
-`PackageFormat`-Property kennst): `certsign/_uno_sign_docx.py` anpassen,
-dann in `certsign/signers.py` die `.docx`-Zeile in `SIGNERS` auf
-`("native", sign_docx)` umstellen.
+If you get this working (or know the correct `StorageFormat`/
+`PackageFormat` property): adjust `certsign/_uno_sign_docx.py`, then in
+`certsign/signers.py` change the `.docx` line in `SIGNERS` to
+`("native", sign_docx)`.
 
-Zum Testen (braucht `libreoffice-writer`, `python3-uno`, `libnss3-tools`):
+To test (needs `libreoffice-writer`, `python3-uno`, `libnss3-tools`):
 
 ```python
 from certsign.docx_sign import sign_docx
 sign_docx("cert.pfx", "password", "in.docx", "out.docx")
 ```
 
-## Abhaengigkeiten (Linux)
+## Dependencies (Linux)
 
 ```bash
 sudo apt install osslsigncode python3-tk default-jdk openssl
 pip install -r requirements.txt   # pyhanko
 ```
 
-## Nutzung
+## Usage
 
 ```bash
 python3 certsign_gui.py
 ```
 
-1. Zertifikat (`.pfx`/`.p12`) auswaehlen + Passwort eingeben
-2. Zu signierende Datei auswaehlen
-3. Ausgabepfad pruefen/anpassen
-4. "Signieren" klicken
+1. Choose a certificate (`.pfx`/`.p12`) + enter the password
+2. Choose the file to sign
+3. Check/adjust the output path
+4. Click "Sign"
 
-## Installation auf Arch Linux
+## Installing on Arch Linux
 
 ```bash
 cd packaging/arch
 makepkg -si
 ```
 
-Baut und installiert `certsign` als Paket; danach per `certsign-gui` oder
-ueber den Anwendungsstarter ("CertSign") aufrufbar. `python-pyhanko` (fuer
-PDF-Signierung) liegt im AUR und muss ggf. separat installiert werden
-(`yay -S python-pyhanko`).
+Builds and installs `certsign` as a package; afterwards launch it via
+`certsign-gui` or from the application launcher ("CertSign").
+`python-pyhanko` (for PDF signing) lives in the AUR and may need to be
+installed separately (`yay -S python-pyhanko`).
 
-## Verifikation
+## Verification
 
-Eingebettete Signaturen (png/jpg/txt) pruefen:
+Check embedded signatures (png/jpg/txt):
 
 ```python
 from certsign.signers import verify_embedded
-verify_embedded("datei-signed.ext")  # True/False
+verify_embedded("file-signed.ext")  # True/False
 ```
 
-Detached Signaturen (docx) pruefen:
+Check detached signatures (docx):
 
 ```bash
-openssl x509 -in datei.ext.sig.cert.pem -pubkey -noout > pub.pem
-openssl dgst -sha256 -verify pub.pem -signature datei.ext.sig datei.ext
+openssl x509 -in file.ext.sig.cert.pem -pubkey -noout > pub.pem
+openssl dgst -sha256 -verify pub.pem -signature file.ext.sig file.ext
 ```
