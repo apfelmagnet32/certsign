@@ -1,0 +1,36 @@
+# Maintainer: (dein Name) <deine@email>
+pkgname=certsign
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="GUI-Tool zum Signieren von Dateien (.exe, .jar, .pdf, ...) mit einem selbstsignierten Zertifikat"
+arch=('any')
+url="https://github.com/apfelmagnet32/idk-what-to-code"
+license=('MIT')
+depends=('python' 'tk' 'openssl' 'jdk-openjdk' 'osslsigncode')
+optdepends=('python-pyhanko: fuer PDF-Signierung')
+source=()
+options=('!strip')
+
+# Dieses PKGBUILD baut direkt aus dem Projekt-Checkout, in dem es liegt
+# (kein separater Tarball noetig): "$startdir" ist das Repo-Root.
+
+package() {
+    local runtime_dir="/usr/lib/certsign"
+    local pydir="$pkgdir$runtime_dir"
+
+    install -d "$pydir/certsign"
+    install -Dm644 "$startdir"/../../certsign/*.py -t "$pydir/certsign"
+    install -Dm755 "$startdir/../../certsign_gui.py" "$pydir/certsign_gui.py"
+
+    install -d "$pkgdir/usr/bin"
+    cat > "$pkgdir/usr/bin/certsign-gui" <<EOF
+#!/bin/sh
+exec python3 "$runtime_dir/certsign_gui.py" "\$@"
+EOF
+    chmod 755 "$pkgdir/usr/bin/certsign-gui"
+
+    install -Dm644 "$startdir/certsign.desktop" \
+        "$pkgdir/usr/share/applications/certsign.desktop"
+    install -Dm644 "$startdir"/../../README.md \
+        "$pkgdir/usr/share/doc/$pkgname/README.md"
+}

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=CertSign
+Comment=Dateien mit einem selbstsignierten Zertifikat signieren
+Exec=certsign-gui
+Icon=application-certificate
+Terminal=false
+Categories=Utility;Security;
