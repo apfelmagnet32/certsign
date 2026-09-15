@@ -1,0 +1,511 @@
+<title>Signature Checker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,500;0,600;1,500&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/forge/1.3.1/forge.min.js"></script>
+
+<style>
+  :root {
+    --ink: #1a2230;
+    --ink-soft: #4b5566;
+    --paper: #f6f5f1;
+    --paper-raised: #ffffff;
+    --line: #d9d6cd;
+    --accent: #1f3a5f;
+    --accent-soft: #e7edf5;
+    --seal: #8a6a2f;
+    --seal-soft: #f3ead4;
+    --good: #2f7d5b;
+    --good-soft: #e6f2ec;
+    --bad: #b23a3a;
+    --bad-soft: #fbeaea;
+    --focus: #1f3a5f;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #e7e9ee;
+      --ink-soft: #a3acbc;
+      --paper: #12161d;
+      --paper-raised: #1a202b;
+      --line: #2b3342;
+      --accent: #7fa3d1;
+      --accent-soft: #1c2a3d;
+      --seal: #c9a95e;
+      --seal-soft: #2c2517;
+      --good: #6fbb96;
+      --good-soft: #16281f;
+      --bad: #e08585;
+      --bad-soft: #2c1616;
+      --focus: #7fa3d1;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ink: #e7e9ee;
+    --ink-soft: #a3acbc;
+    --paper: #12161d;
+    --paper-raised: #1a202b;
+    --line: #2b3342;
+    --accent: #7fa3d1;
+    --accent-soft: #1c2a3d;
+    --seal: #c9a95e;
+    --seal-soft: #2c2517;
+    --good: #6fbb96;
+    --good-soft: #16281f;
+    --bad: #e08585;
+    --bad-soft: #2c1616;
+    --focus: #7fa3d1;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+    padding: 0 20px;
+    padding-block: 48px 64px;
+  }
+
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  h1 {
+    font-family: "Spectral", Georgia, serif;
+    font-weight: 600;
+    font-size: clamp(1.7rem, 4vw, 2.2rem);
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .eyebrow {
+    font-size: 0.75rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--seal);
+    font-weight: 600;
+    margin: 0 0 6px;
+  }
+
+  .lede {
+    color: var(--ink-soft);
+    font-size: 1rem;
+    line-height: 1.55;
+    max-width: 60ch;
+    margin: 10px 0 0;
+  }
+
+  .lede code, .mono {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.88em;
+  }
+
+  header { border-bottom: 1px solid var(--line); padding-bottom: 24px; }
+
+  /* Drop zone */
+  #dropzone {
+    background: var(--paper-raised);
+    border: 1.5px dashed var(--line);
+    border-radius: 10px;
+    padding: 36px 24px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    transition: border-color 0.15s ease, background 0.15s ease;
+    cursor: pointer;
+  }
+  #dropzone:hover, #dropzone.drag {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  #dropzone:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+
+  .drop-icon {
+    width: 40px; height: 40px;
+    color: var(--seal);
+  }
+
+  #dropzone .primary { font-weight: 600; font-size: 1.02rem; }
+  #dropzone .secondary { color: var(--ink-soft); font-size: 0.88rem; }
+  #fileInput { display: none; }
+
+  .filename-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.85rem;
+    background: var(--accent-soft);
+    color: var(--accent);
+    padding: 5px 12px;
+    border-radius: 999px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Result panel */
+  #result { display: flex; flex-direction: column; gap: 16px; }
+  #result[hidden] { display: none; }
+
+  .verdict {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 20px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+  }
+  .verdict.good { background: var(--good-soft); border-color: color-mix(in srgb, var(--good) 35%, var(--line)); }
+  .verdict.bad  { background: var(--bad-soft);  border-color: color-mix(in srgb, var(--bad) 35%, var(--line)); }
+  .verdict.none { background: var(--paper-raised); }
+
+  .verdict-icon {
+    width: 30px; height: 30px;
+    flex-shrink: 0;
+  }
+  .verdict.good .verdict-icon { color: var(--good); }
+  .verdict.bad .verdict-icon  { color: var(--bad); }
+  .verdict.none .verdict-icon { color: var(--ink-soft); }
+
+  .verdict-title { font-weight: 600; font-size: 1.05rem; }
+  .verdict-sub { color: var(--ink-soft); font-size: 0.88rem; margin-top: 2px; }
+
+  .field-grid {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 10px 18px;
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 20px;
+    font-size: 0.92rem;
+  }
+  .field-grid dt {
+    color: var(--ink-soft);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding-top: 2px;
+    white-space: nowrap;
+  }
+  .field-grid dd {
+    margin: 0;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.85rem;
+    word-break: break-all;
+  }
+
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  button.action {
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.88rem;
+    padding: 9px 16px;
+    border-radius: 7px;
+    border: 1px solid var(--line);
+    background: var(--paper-raised);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  button.action:hover { border-color: var(--accent); color: var(--accent); }
+  button.action:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  section.how {
+    border-top: 1px solid var(--line);
+    padding-top: 22px;
+    color: var(--ink-soft);
+    font-size: 0.88rem;
+    line-height: 1.6;
+  }
+  section.how h2 {
+    font-family: "Spectral", serif;
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--ink);
+    margin: 0 0 8px;
+  }
+  section.how ol { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 4px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+
+<main>
+  <header>
+    <p class="eyebrow">CertSign · Local Check</p>
+    <h1>Is this file signed?</h1>
+    <p class="lede">
+      Checks files signed with <span class="mono">CertSign</span> (embedded block at
+      the end of the file: <span class="mono">-----BEGIN CERTSIGN SIGNATURE-----</span>).
+      Everything runs in the browser &mdash; nothing is uploaded.
+    </p>
+  </header>
+
+  <div id="dropzone" tabindex="0" role="button" aria-label="Choose a file to check">
+    <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 15V4"/><path d="m7 9 5-5 5 5"/><path d="M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/>
+    </svg>
+    <div class="primary">Drag a file here or click to choose</div>
+    <div class="secondary">.txt, .png, .jpg &mdash; or any other file signed with CertSign</div>
+  </div>
+  <input type="file" id="fileInput">
+
+  <div id="result">
+    <div class="verdict none" id="verdict">
+      <svg class="verdict-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><circle cx="12" cy="16" r="0.6" fill="currentColor" stroke="none"/>
+      </svg>
+      <div>
+        <div class="verdict-title" id="verdictTitle">No file checked yet</div>
+        <div class="verdict-sub" id="verdictSub">Choose a file above to check its signature.</div>
+      </div>
+    </div>
+
+    <dl class="field-grid" id="fieldGrid" hidden></dl>
+
+    <div class="actions" id="actions" hidden>
+      <button class="action" id="downloadOriginal">Download unsigned content</button>
+    </div>
+  </div>
+
+  <section class="how">
+    <h2>What's being checked here</h2>
+    <ol>
+      <li>The file is searched for the signature block at the end (algorithm, signature, certificate &mdash; all base64-encoded).</li>
+      <li>The public key is read from the embedded certificate.</li>
+      <li>The RSA-SHA256 signature is verified against the content <em>before</em> the signature block.</li>
+      <li>If even one byte of the original content changes, step 3 fails.</li>
+    </ol>
+  </section>
+</main>
+
+<script>
+(function () {
+  const MARKER = "\n-----BEGIN CERTSIGN SIGNATURE-----\n";
+  const END_MARKER = "-----END CERTSIGN SIGNATURE-----";
+
+  const dropzone = document.getElementById("dropzone");
+  const fileInput = document.getElementById("fileInput");
+  const verdict = document.getElementById("verdict");
+  const verdictTitle = document.getElementById("verdictTitle");
+  const verdictSub = document.getElementById("verdictSub");
+  const fieldGrid = document.getElementById("fieldGrid");
+  const actions = document.getElementById("actions");
+  const downloadBtn = document.getElementById("downloadOriginal");
+
+  let currentOriginalBytes = null;
+  let currentFileName = "";
+
+  dropzone.addEventListener("click", () => fileInput.click());
+  dropzone.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); }
+  });
+  ["dragenter", "dragover"].forEach(evt =>
+    dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.add("drag"); })
+  );
+  ["dragleave", "drop"].forEach(evt =>
+    dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.remove("drag"); })
+  );
+  dropzone.addEventListener("drop", (e) => {
+    const f = e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files[0]) handleFile(fileInput.files[0]);
+  });
+
+  function findMarker(bytes) {
+    const markerBytes = new TextEncoder().encode(MARKER);
+    outer:
+    for (let i = 0; i <= bytes.length - markerBytes.length; i++) {
+      for (let j = 0; j < markerBytes.length; j++) {
+        if (bytes[i + j] !== markerBytes[j]) continue outer;
+      }
+      return i;
+    }
+    return -1;
+  }
+
+  function bytesToBinaryString(bytes) {
+    let s = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      s += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    }
+    return s;
+  }
+
+  async function handleFile(file) {
+    currentFileName = file.name;
+    const buf = await file.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    const idx = findMarker(bytes);
+
+    if (idx === -1) {
+      showNoSignature();
+      return;
+    }
+
+    const originalBytes = bytes.subarray(0, idx);
+    const markerLen = new TextEncoder().encode(MARKER).length;
+    const trailerText = new TextDecoder("utf-8", { fatal: false }).decode(bytes.subarray(idx + markerLen));
+
+    const fields = {};
+    for (const line of trailerText.split("\n")) {
+      if (line.startsWith("-----END")) break;
+      const m = line.match(/^([A-Za-z]+): (.+)$/);
+      if (m) fields[m[1]] = m[2];
+    }
+
+    if (!fields.Signature || !fields.Certificate) {
+      showBroken();
+      return;
+    }
+
+    try {
+      const sigBytes = base64ToBytes(fields.Signature);
+      const certPemFull = atob(fields.Certificate);
+      const certMatch = certPemFull.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/);
+      if (!certMatch) throw new Error("No certificate found in the signature block.");
+
+      const cert = forge.pki.certificateFromPem(certMatch[0]);
+      const publicKey = cert.publicKey;
+
+      const md = forge.md.sha256.create();
+      md.update(bytesToBinaryString(originalBytes));
+
+      const valid = publicKey.verify(md.digest().bytes(), bytesToBinaryString(sigBytes));
+
+      currentOriginalBytes = originalBytes;
+
+      if (valid) {
+        showValid(fields, cert);
+      } else {
+        showInvalid(fields, cert);
+      }
+    } catch (err) {
+      showError(err);
+    }
+  }
+
+  function base64ToBytes(b64) {
+    const bin = atob(b64.replace(/\s+/g, ""));
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+
+  function subjectLine(cert) {
+    return cert.subject.attributes.map(a => `${a.shortName || a.name}=${a.value}`).join(", ");
+  }
+
+  function iconCheck() {
+    return '<path d="m5 12 5 5 9-9"/>';
+  }
+  function iconCross() {
+    return '<path d="M6 6l12 12M18 6L6 18"/>';
+  }
+  function iconDash() {
+    return '<circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><circle cx="12" cy="16" r="0.6" fill="currentColor" stroke="none"/>';
+  }
+
+  function setVerdict(kind, title, sub, iconSvg) {
+    verdict.className = "verdict " + kind;
+    verdictTitle.textContent = title;
+    verdictSub.textContent = sub;
+    verdict.querySelector(".verdict-icon").innerHTML = iconSvg;
+  }
+
+  function showValid(fields, cert) {
+    setVerdict("good", "Signature valid", `"${currentFileName}" is unchanged since it was signed.`, iconCheck());
+    fieldGrid.hidden = false;
+    fieldGrid.innerHTML = `
+      <dt>Publisher</dt><dd>${escapeHtml(subjectLine(cert))}</dd>
+      <dt>Algorithm</dt><dd>${escapeHtml(fields.Algorithm || "?")}</dd>
+      <dt>Valid until</dt><dd>${escapeHtml(cert.validity.notAfter.toISOString().slice(0,10))}</dd>
+    `;
+    actions.hidden = false;
+  }
+
+  function showInvalid(fields, cert) {
+    setVerdict("bad", "Signature invalid", `"${currentFileName}" was modified after signing (or the certificate/signature don't match).`, iconCross());
+    fieldGrid.hidden = false;
+    fieldGrid.innerHTML = `
+      <dt>Publisher</dt><dd>${escapeHtml(subjectLine(cert))}</dd>
+      <dt>Algorithm</dt><dd>${escapeHtml(fields.Algorithm || "?")}</dd>
+    `;
+    actions.hidden = false;
+  }
+
+  function showNoSignature() {
+    setVerdict("none", "No CertSign signature found", `"${currentFileName}" contains no CertSign signature block.`, iconDash());
+    fieldGrid.hidden = true;
+    actions.hidden = true;
+    currentOriginalBytes = null;
+  }
+
+  function showBroken() {
+    setVerdict("bad", "Signature block corrupted", `The signature block in "${currentFileName}" is incomplete.`, iconCross());
+    fieldGrid.hidden = true;
+    actions.hidden = true;
+  }
+
+  function showError(err) {
+    setVerdict("bad", "Check failed", String(err && err.message ? err.message : err), iconCross());
+    fieldGrid.hidden = true;
+    actions.hidden = true;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
+  let downloadsApi = null;
+  if (window.claude && window.claude.use) {
+    window.claude.use("downloads").then(api => {
+      downloadsApi = api;
+      if (!api) downloadBtn.hidden = true;
+    });
+  } else {
+    downloadBtn.hidden = true;
+  }
+
+  downloadBtn.addEventListener("click", async () => {
+    if (!currentOriginalBytes || !downloadsApi) return;
+    const suggestedName = currentFileName.replace("-signed", "") || "original.txt";
+    downloadBtn.disabled = true;
+    const originalLabel = downloadBtn.textContent;
+    try {
+      const result = await downloadsApi.save({
+        filename: suggestedName,
+        data: new Blob([currentOriginalBytes]),
+      });
+      downloadBtn.textContent = result.status === "saved" ? "Saved" : "Delivered";
+      setTimeout(() => { downloadBtn.textContent = originalLabel; }, 2000);
+    } catch (err) {
+      if (err && err.code === "declined") {
+        // viewer said no - nothing to show
+      } else {
+        downloadBtn.textContent = "Failed";
+        setTimeout(() => { downloadBtn.textContent = originalLabel; }, 2000);
+      }
+    } finally {
+      downloadBtn.disabled = false;
+    }
+  });
+})();
+</script>
