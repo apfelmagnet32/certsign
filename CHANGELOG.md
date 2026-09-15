@@ -3,7 +3,7 @@
 All notable changes to CertSign are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [1.0.1]
 
 ### Fixed
 - `generate_self_signed_pfx()` now adds the `extendedKeyUsage=codeSigning`
