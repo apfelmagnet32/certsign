@@ -1,11 +1,11 @@
-# Maintainer: (your name) <your@email>
+# Maintainer: apfelmagnet32 <contact@apfelserver.net>
 pkgname=certsign
 pkgver=1.0.0
 pkgrel=1
 pkgdesc="GUI tool for signing files (.exe, .jar, .pdf, ...) with a self-signed certificate"
 arch=('any')
-url="https://github.com/apfelmagnet32/idk-what-to-code"
-license=('MIT')
+url="https://github.com/apfelmagnet32/certsign"
+license=('custom')
 depends=('python' 'tk' 'openssl' 'jdk-openjdk' 'osslsigncode')
 optdepends=('python-pyhanko: for PDF signing')
 source=()
@@ -33,4 +33,6 @@ EOF
         "$pkgdir/usr/share/applications/certsign.desktop"
     install -Dm644 "$startdir"/../../README.md \
         "$pkgdir/usr/share/doc/$pkgname/README.md"
+    install -Dm644 "$startdir"/../../LICENSE \
+        "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }
